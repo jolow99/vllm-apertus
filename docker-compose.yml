@@ -1,6 +1,6 @@
 services:
   vllm-apertus:
-    image: vllm/vllm-openai:nightly
+    image: vllm-local
     container_name: vllm-apertus
     ports:
       - "8000:8000"
