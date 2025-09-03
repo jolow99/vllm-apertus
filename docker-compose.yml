@@ -1,0 +1,32 @@
+services:
+  vllm-apertus:
+    image: vllm/vllm-openai:v0.10.2rc1
+    container_name: vllm-apertus
+    ports:
+      - "8000:8000"
+    environment:
+      - VLLM_API_KEY=${VLLM_API_KEY}
+      - HUGGING_FACE_HUB_TOKEN=${HUGGING_FACE_HUB_TOKEN}
+    command: >
+      --model swiss-ai/Apertus-8B-Instruct-2509
+      --host 0.0.0.0
+      --port 8000
+      --api-key ${VLLM_API_KEY}
+      --gpu-memory-utilization 0.8
+      --max-model-len 8192
+      --dtype auto
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
