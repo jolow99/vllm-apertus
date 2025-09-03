@@ -1,7 +1,7 @@
 services:
   vllm-apertus:
     build:
-      context: https://github.com/vllm-project/vllm.git#v0.10.2rc1
+      context: https://github.com/vllm-project/vllm.git#main
       dockerfile: docker/Dockerfile
     container_name: vllm-apertus
     ports:
