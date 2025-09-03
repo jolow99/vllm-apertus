@@ -1,8 +1,6 @@
 services:
   vllm-apertus:
-    build:
-      context: https://github.com/vllm-project/vllm.git#main
-      dockerfile: docker/Dockerfile
+    image: vllm/vllm-openai:nightly
     container_name: vllm-apertus
     ports:
       - "8000:8000"
