@@ -4,6 +4,8 @@ services:
     container_name: vllm-apertus
     ports:
       - "8000:8000"
+    volumes:
+      - ./hf_cache:/root/.cache/huggingface
     environment:
       - VLLM_API_KEY=${VLLM_API_KEY}
       - HUGGING_FACE_HUB_TOKEN=${HUGGING_FACE_HUB_TOKEN}
