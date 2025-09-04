@@ -1,9 +1,22 @@
 services:
+  nginx:
+    image: nginx:alpine
+    container_name: vllm-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - vllm-apertus
+    restart: unless-stopped
+
   vllm-apertus:
     image: vllm/vllm-apertus
     container_name: vllm-apertus
-    ports:
-      - "8000:8000"
+    expose:
+      - "8000"
     volumes:
       - ./hf_cache:/root/.cache/huggingface
     environment:
