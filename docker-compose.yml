@@ -1,6 +1,6 @@
 services:
   vllm-apertus:
-    image: vllm-local
+    image: vllm/vllm-apertus
     container_name: vllm-apertus
     ports:
       - "8000:8000"
