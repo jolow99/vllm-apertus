@@ -11,6 +11,12 @@ services:
     depends_on:
       - vllm-apertus
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+        reservations:
+          memory: 1G
 
   vllm-apertus:
     image: vllm/vllm-apertus
