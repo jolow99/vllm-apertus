@@ -62,6 +62,15 @@ deploy() {
         exit 1
     fi
 
+    if [ -n "$EXPECTED_KUBE_CONTEXT" ]; then
+        CURRENT_CONTEXT=$(kubectl config current-context)
+        if [ "$CURRENT_CONTEXT" != "$EXPECTED_KUBE_CONTEXT" ]; then
+            print_warning "Switching to expected Kubernetes context: $EXPECTED_KUBE_CONTEXT"
+            kubectl config use-context "$EXPECTED_KUBE_CONTEXT"
+        fi
+        print_info "Using Kubernetes context: $EXPECTED_KUBE_CONTEXT"
+    fi
+
     print_info "Checking ingress controller..."
     check_ingress_controller
 
