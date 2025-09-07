@@ -1,0 +1,11 @@
+apiVersion: v2
+name: vllm-apertus
+description: vLLM Apertus deployment using official production stack
+type: application
+version: 0.1.0
+appVersion: "latest"
+
+dependencies:
+  - name: vllm-stack
+    version: "0.1.7"
+    repository: "https://vllm-project.github.io/production-stack"
