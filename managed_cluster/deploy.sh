@@ -15,6 +15,40 @@ print_info() { echo -e "${GREEN}[INFO]${NC} $1"; }
 print_error() { echo -e "${RED}[ERROR]${NC} $1"; }
 print_warning() { echo -e "${YELLOW}[WARNING]${NC} $1"; }
 
+check_ingress_controller() {
+    if ! kubectl get ingressclass nginx >/dev/null 2>&1; then
+        print_warning "nginx-ingress controller not found. Installing..."
+        helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx >/dev/null 2>&1 || true
+        helm repo update >/dev/null 2>&1
+        helm upgrade --install ingress-nginx ingress-nginx/ingress-nginx \
+            --namespace ingress-nginx \
+            --create-namespace \
+            --set controller.service.type=LoadBalancer
+        print_info "Waiting for ingress controller to be ready..."
+        kubectl wait --namespace ingress-nginx \
+            --for=condition=ready pod \
+            --selector=app.kubernetes.io/component=controller \
+            --timeout=300s
+    fi
+}
+
+check_cert_manager() {
+    if ! kubectl get namespace cert-manager >/dev/null 2>&1; then
+        print_warning "cert-manager not found. Installing..."
+        helm repo add jetstack https://charts.jetstack.io >/dev/null 2>&1 || true
+        helm repo update >/dev/null 2>&1
+        helm upgrade --install cert-manager jetstack/cert-manager \
+            --namespace cert-manager \
+            --create-namespace \
+            --set installCRDs=true
+        print_info "Waiting for cert-manager to be ready..."
+        kubectl wait --namespace cert-manager \
+            --for=condition=ready pod \
+            --selector=app.kubernetes.io/name=cert-manager \
+            --timeout=300s
+    fi
+}
+
 deploy() {
     if [ ! -f ".env" ]; then
         print_error ".env file not found. Please copy .env.example to .env and fill in your values."
@@ -27,6 +61,12 @@ deploy() {
         print_error "VLLM_API_KEY and HUGGING_FACE_HUB_TOKEN must be set in .env file"
         exit 1
     fi
+
+    print_info "Checking ingress controller..."
+    check_ingress_controller
+
+    print_info "Checking cert-manager..."
+    check_cert_manager
 
     print_info "Updating Helm dependencies..."
     helm dependency update

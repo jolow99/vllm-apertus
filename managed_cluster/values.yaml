@@ -52,10 +52,32 @@ vllm-stack:
   routerSpec:
     enableRouter: true
     replicaCount: 1
-    serviceType: LoadBalancer
+    serviceType: ClusterIP  # Change to ClusterIP so ingress can reach it
     servicePort: 80
+    
+    # Ingress configuration for SSL termination (sits in front of router)
+    ingress:
+      enabled: true
+      className: "nginx"
+      annotations:
+        cert-manager.io/cluster-issuer: "letsencrypt-prod"
+        nginx.ingress.kubernetes.io/ssl-redirect: "true"
+        nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+      hosts:
+        - host: api-internal-exoscale-2.publicai.co
+          paths:
+            - path: /
+              pathType: Prefix
+      tls:
+        - secretName: vllm-apertus-tls
+          hosts:
+            - api-internal-exoscale-2.publicai.co
     
     # Router should look for serving engines with these labels
     labels:
       environment: "production"
       release: "apertus"
+
+# SSL certificate configuration
+ssl:
+  email: "support@publicai.co"  # Change this to your email for Let's Encrypt
