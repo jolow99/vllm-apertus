@@ -19,7 +19,7 @@ services:
           memory: 1G
 
   vllm-apertus:
-    image: vllm/vllm-apertus
+    image: ghcr.io/forpublicai/vllm-apertus
     container_name: vllm-apertus
     expose:
       - "8000"
