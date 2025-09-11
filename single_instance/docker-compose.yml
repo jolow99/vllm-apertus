@@ -36,6 +36,7 @@ services:
       --gpu-memory-utilization 0.8
       --max-model-len 8192
       --dtype auto
+      --tensor-parallel-size 8
     deploy:
       resources:
         reservations:
