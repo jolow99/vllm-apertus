@@ -9,7 +9,8 @@ services:
       - ./nginx.conf:/etc/nginx/nginx.conf:ro
       - ./ssl:/etc/nginx/ssl:ro
     depends_on:
-      - vllm-apertus
+      - vllm-apertus-70b
+      - vllm-apertus-8b
     restart: unless-stopped
     deploy:
       resources:
@@ -18,9 +19,9 @@ services:
         reservations:
           memory: 1G
 
-  vllm-apertus:
+  vllm-apertus-70b:
     image: ghcr.io/forpublicai/vllm-apertus
-    container_name: vllm-apertus
+    container_name: vllm-apertus-70b
     expose:
       - "8000"
     volumes:
@@ -28,24 +29,61 @@ services:
     environment:
       - VLLM_API_KEY=${VLLM_API_KEY}
       - HUGGING_FACE_HUB_TOKEN=${HUGGING_FACE_HUB_TOKEN}
+      - CUDA_VISIBLE_DEVICES=0,1,2,3,4,5
     command: >
-      --model swiss-ai/Apertus-8B-Instruct-2509
+      --model swiss-ai/Apertus-70B-Instruct-2509
       --host 0.0.0.0
       --port 8000
       --api-key ${VLLM_API_KEY}
       --gpu-memory-utilization 0.8
       --max-model-len 8192
       --dtype auto
+      --tensor-parallel-size 6
     deploy:
       resources:
         reservations:
           devices:
             - driver: nvidia
-              count: 1
+              device_ids: ['0','1','2','3','4','5']
               capabilities: [gpu]
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  vllm-apertus-8b:
+    image: ghcr.io/forpublicai/vllm-apertus
+    container_name: vllm-apertus-8b
+    expose:
+      - "8001"
+    volumes:
+      - ./hf_cache:/root/.cache/huggingface
+    environment:
+      - VLLM_API_KEY=${VLLM_API_KEY}
+      - HUGGING_FACE_HUB_TOKEN=${HUGGING_FACE_HUB_TOKEN}
+      - CUDA_VISIBLE_DEVICES=6,7
+    command: >
+      --model swiss-ai/Apertus-8B-Instruct-2509
+      --host 0.0.0.0
+      --port 8001
+      --api-key ${VLLM_API_KEY}
+      --gpu-memory-utilization 0.8
+      --max-model-len 8192
+      --dtype auto
+      --tensor-parallel-size 2
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              device_ids: ['6','7']
+              capabilities: [gpu]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
       interval: 30s
       timeout: 10s
       retries: 3
