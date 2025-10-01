@@ -4,38 +4,39 @@ vllm-stack:
     runtimeClassName: ""
     labels:
       environment: "production"
-      release: "apertus"
-      
+      release: "vllm-apertus"
+      component: "engine"
+
     modelSpec:
       - name: "apertus-8b"
-        repository: "ghcr.io/forpublicai/vllm-apertus"
-        tag: "latest"
+        repository: "vllm/vllm-openai"
+        tag: "v0.10.2"
         modelURL: "swiss-ai/Apertus-8B-Instruct-2509"
-        replicaCount: 8
-        
+        replicaCount: 2
+
         requestCPU: 18
         requestMemory: "95Gi"
         requestGPU: 1
-        
+
         limitCPU: 20
         limitMemory: "105Gi"
-        
-          
+
+
         vllmConfig:
           maxModelLen: 8192
           gpuMemoryUtilization: 0.8
           dtype: "auto"
-          
+
         # These will be set via command line to avoid storing secrets in git
         # hf_token: "your-hugging-face-token"
-          
+
         nodeSelectorTerms:
           - matchExpressions:
             - key: "node.kubernetes.io/instance-type"
               operator: "In"
               values:
               - "gpua5000.medium"
-              
+
         affinity:
           podAntiAffinity:
             preferredDuringSchedulingIgnoredDuringExecution:
@@ -49,12 +50,58 @@ vllm-stack:
                     - apertus-8b
                 topologyKey: kubernetes.io/hostname
 
+      - name: "salamandra-7b"
+        repository: "vllm/vllm-openai"
+        tag: "v0.10.2"
+        modelURL: "BSC-LT/salamandra-7b-instruct"
+        replicaCount: 2
+
+        requestCPU: 18
+        requestMemory: "95Gi"
+        requestGPU: 1
+
+        limitCPU: 20
+        limitMemory: "105Gi"
+
+
+        vllmConfig:
+          maxModelLen: 8192
+          gpuMemoryUtilization: 0.8
+          dtype: "auto"
+
+        # These will be set via command line to avoid storing secrets in git
+        # hf_token: "your-hugging-face-token"
+
+        nodeSelectorTerms:
+          - matchExpressions:
+            - key: "node.kubernetes.io/instance-type"
+              operator: "In"
+              values:
+              - "gpua5000.medium"
+
+        affinity:
+          podAntiAffinity:
+            preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                  - key: model
+                    operator: In
+                    values:
+                    - salamandra-7b
+                topologyKey: kubernetes.io/hostname
+
   routerSpec:
     enableRouter: true
     replicaCount: 1
     serviceType: ClusterIP  # Change to ClusterIP so ingress can reach it
     servicePort: 80
-    
+    labels:
+      environment: "production"
+      release: "vllm-apertus"
+      component: "router"
+
     # Ingress configuration for SSL termination (sits in front of router)
     ingress:
       enabled: true
@@ -72,11 +119,6 @@ vllm-stack:
         - secretName: vllm-apertus-tls
           hosts:
             - api-internal-exoscale-2.publicai.co
-    
-    # Router should look for serving engines with these labels
-    labels:
-      environment: "production"
-      release: "apertus"
 
 # SSL certificate configuration
 ssl:

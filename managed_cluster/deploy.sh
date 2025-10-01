@@ -90,7 +90,7 @@ deploy() {
         --values values.yaml \
         --set "vllm-stack.servingEngineSpec.vllmApiKey=$VLLM_API_KEY" \
         --set "vllm-stack.servingEngineSpec.modelSpec[0].hf_token=$HUGGING_FACE_HUB_TOKEN" \
-        --set-string "vllm-stack.routerSpec.extraArgs={--k8s-label-selector,environment=production\\,release=apertus}"
+        --set-string "vllm-stack.routerSpec.extraArgs={--k8s-label-selector,environment=production\\,release=vllm-apertus\\,component=engine}"
 
     print_info "Deployment completed!"
     kubectl get svc "$RELEASE_NAME-router-service" -n "$NAMESPACE"
