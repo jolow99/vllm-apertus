@@ -164,14 +164,14 @@ class ApertusJsonToolParser(ToolParser):
             if len(tool_call_arr) > 0:
                 raw_call = tool_call_arr[self.current_tool_id]
                 # Convert to expected format
-                if raw_call and len(raw_call) == 1:
+                if isinstance(raw_call, dict) and len(raw_call) == 1:
                     func_name = list(raw_call.keys())[0]
                     current_tool_call = {
                         "name": func_name,
                         "arguments": raw_call[func_name]
                     }
                 else:
-                    current_tool_call = raw_call
+                    current_tool_call = raw_call if isinstance(raw_call, dict) else {}
             else:
                 current_tool_call = {}
 
