@@ -121,7 +121,9 @@ class ApertusJsonToolParser(ToolParser):
     ) -> Union[DeltaMessage, None]:
 
         if not (current_text.startswith(self.bot_token)
-                or current_text.startswith('{')):
+                or current_text.startswith('{')
+                or current_text.startswith('[')):
+
             return DeltaMessage(content=delta_text)
 
         # bit mask flags for partial JSON parsing. If the name hasn't been
