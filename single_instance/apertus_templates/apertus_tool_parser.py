@@ -160,8 +160,20 @@ class ApertusJsonToolParser(ToolParser):
                 return None
 
             # select as the current tool call the one we're on the state at
-            current_tool_call: dict = tool_call_arr[self.current_tool_id] \
-                if len(tool_call_arr) > 0 else {}
+            # Handle the format {"function_name": {params}}
+            if len(tool_call_arr) > 0:
+                raw_call = tool_call_arr[self.current_tool_id]
+                # Convert to expected format
+                if raw_call and len(raw_call) == 1:
+                    func_name = list(raw_call.keys())[0]
+                    current_tool_call = {
+                        "name": func_name,
+                        "arguments": raw_call[func_name]
+                    }
+                else:
+                    current_tool_call = raw_call
+            else:
+                current_tool_call = {}
 
             # case -- if no tokens have been streamed for the tool, e.g.
             #   only the array brackets, stream nothing
