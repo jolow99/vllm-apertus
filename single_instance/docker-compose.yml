@@ -66,7 +66,7 @@ services:
       - HUGGING_FACE_HUB_TOKEN=${HUGGING_FACE_HUB_TOKEN}
       - CUDA_VISIBLE_DEVICES=2,3,4,5,6,7
     command: >
-      --model BSC-LT/ALIA-40b-instruct_Q8_0
+      --model /root/.cache/huggingface/ALIA-40b-instruct_Q8_0/ALIA-40b-instruct_bos_Q8_0.gguf
       --host 0.0.0.0
       --port 8001
       --api-key ${VLLM_API_KEY}
