@@ -29,7 +29,6 @@ services:
     environment:
       - VLLM_API_KEY=${VLLM_API_KEY}
       - HUGGING_FACE_HUB_TOKEN=${HUGGING_FACE_HUB_TOKEN}
-      - CUDA_VISIBLE_DEVICES=0,1,2,3
     command: >
       --model BSC-LT/salamandra-7b-instruct-tools-16k
       --host 0.0.0.0
@@ -64,7 +63,6 @@ services:
     environment:
       - VLLM_API_KEY=${VLLM_API_KEY}
       - HUGGING_FACE_HUB_TOKEN=${HUGGING_FACE_HUB_TOKEN}
-      - CUDA_VISIBLE_DEVICES=4,5,6,7
     command: >
       --model /root/.cache/huggingface/ALIA-40b-instruct_Q8_0/ALIA-40b-instruct_bos_Q8_0.gguf
       --host 0.0.0.0
