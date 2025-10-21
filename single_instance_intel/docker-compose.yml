@@ -19,7 +19,7 @@ services:
           memory: 1G
 
   vllm-apertus:
-    image: vllm/vllm-openai:v0.10.2
+    image: openeuler/vllm-cpu:latest
     container_name: vllm-apertus
     expose:
       - "8000"
