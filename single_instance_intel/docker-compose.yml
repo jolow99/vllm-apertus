@@ -19,7 +19,7 @@ services:
           memory: 1G
 
   vllm-apertus:
-    image: openeuler/vllm-cpu:latest
+    image: public.ecr.aws/q9t5s3a7/vllm-cpu-release-repo:latest
     container_name: vllm-apertus
     expose:
       - "8000"
