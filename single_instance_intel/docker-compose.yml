@@ -40,12 +40,6 @@ services:
       --enable-auto-tool-choice
       --tool-call-parser apertus_json
       --chat-template /app/apertus_templates/apertus_chat_template.jinja
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              capabilities: [gpu]
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
