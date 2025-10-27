@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# Comprehensive LLM Deployment Benchmark
-# Tests: TTFT, TPOT, percentiles, variable lengths, load patterns
+# Comprehensive LLM Deployment Benchmark v2 (Fixed)
+# Tests: Latency, percentiles, variable lengths, load patterns
 # Runtime: ~3-5 minutes
 
 set -e
@@ -15,11 +15,10 @@ if [ -f "$SCRIPT_DIR/.env" ]; then
 fi
 
 # Configuration
-TOTAL_RUNTIME_SECONDS=240  # 4 minutes of actual testing
 TMPDIR=$(mktemp -d)
 
 echo "╔════════════════════════════════════════════════════╗"
-echo "║   Comprehensive LLM Deployment Benchmark           ║"
+echo "║   Comprehensive LLM Deployment Benchmark v2        ║"
 echo "╚════════════════════════════════════════════════════╝"
 echo ""
 
@@ -41,53 +40,39 @@ fi
 echo "   ✓ Server reachable at ${BASE_URL}/v1"
 echo ""
 
-# Helper function to make streaming requests and measure TTFT and TPOT
+# Helper function to make requests and measure timing
 make_request() {
   local prompt="$1"
   local max_tokens="$2"
   local output_file="$3"
 
   local start_time=$(date +%s.%N)
-  local first_token_time=""
-  local last_token_time=""
-  local token_count=0
 
-  # Use server-sent events (streaming) to capture TTFT
-  response=$(curl -s -k -N -X POST "${BASE_URL}/v1/completions" \
-    -H "Content-Type: application/json" \
-    -H "Authorization: Bearer ${VLLM_API_KEY}" \
-    -d "{\"model\":\"swiss-ai/Apertus-8B-Instruct-2509\",\"prompt\":\"${prompt}\",\"max_tokens\":${max_tokens},\"stream\":true}" \
-    2>/dev/null)
-
-  # For non-streaming, capture timing differently
   response=$(curl -s -k -X POST "${BASE_URL}/v1/completions" \
     -H "Content-Type: application/json" \
     -H "Authorization: Bearer ${VLLM_API_KEY}" \
-    -w "\nTIME_TOTAL:%{time_total}" \
     -d "{\"model\":\"swiss-ai/Apertus-8B-Instruct-2509\",\"prompt\":\"${prompt}\",\"max_tokens\":${max_tokens}}" \
     2>/dev/null)
 
   local end_time=$(date +%s.%N)
-  local total_time=$(echo "$end_time - $start_time" | bc)
+  local total_time=$(echo "$end_time - $start_time" | bc -l)
 
   # Extract metrics from response
   local completion_tokens=$(echo "$response" | grep -o '"completion_tokens":[0-9]*' | grep -o '[0-9]*' | head -1)
   local prompt_tokens=$(echo "$response" | grep -o '"prompt_tokens":[0-9]*' | grep -o '[0-9]*' | head -1)
 
-  if [ -z "$completion_tokens" ]; then
-    completion_tokens=0
-  fi
-  if [ -z "$prompt_tokens" ]; then
-    prompt_tokens=0
-  fi
+  # Set defaults if empty
+  completion_tokens=${completion_tokens:-0}
+  prompt_tokens=${prompt_tokens:-0}
 
-  # Estimate TTFT and TPOT (rough approximation without true streaming)
+  # Estimate TTFT and TPOT
   # TTFT is roughly 20-30% of total time for prefill
-  local ttft=$(echo "$total_time * 0.25" | bc)
-  local decode_time=$(echo "$total_time - $ttft" | bc)
+  local ttft=$(echo "$total_time * 0.25" | bc -l)
+  local decode_time=$(echo "$total_time - $ttft" | bc -l)
   local tpot=0
+
   if [ "$completion_tokens" -gt 0 ]; then
-    tpot=$(echo "scale=4; $decode_time / $completion_tokens" | bc)
+    tpot=$(echo "scale=4; $decode_time / $completion_tokens" | bc -l)
   fi
 
   # Check if request succeeded
@@ -98,7 +83,7 @@ make_request() {
   fi
 }
 
-# Test 1: Single request latency (baseline)
+# Test 1: Baseline latency
 echo "[2/6] Testing baseline latency (3 requests)..."
 for i in {1..3}; do
   make_request "What is machine learning?" 50 "$TMPDIR/baseline.txt" &
@@ -143,8 +128,8 @@ wait
 echo "   ✓ Variable output test complete"
 echo ""
 
-# Test 4: Concurrent load (find capacity)
-echo "[5/6] Testing concurrent load (5 different levels, 25 requests total)..."
+# Test 4: Concurrent load
+echo "[5/6] Testing concurrent load (25 requests total)..."
 # 2 concurrent
 for i in {1..2}; do
   make_request "Test query $i" 50 "$TMPDIR/concurrent_2.txt" &
@@ -173,11 +158,10 @@ echo "   ✓ Concurrent load test complete"
 echo ""
 
 # Test 5: Sustained load
-echo "[6/6] Testing sustained throughput (20 requests over time)..."
+echo "[6/6] Testing sustained throughput (20 requests)..."
 start_sustained=$(date +%s)
 for i in {1..20}; do
   make_request "Query $i" 50 "$TMPDIR/sustained.txt" &
-  # Small delay between requests to simulate realistic traffic
   sleep 0.5
 done
 wait
@@ -193,84 +177,77 @@ echo "╚═══════════════════════�
 echo ""
 
 # Function to calculate percentiles
-calculate_stats() {
-  local file=$1
-  local metric_index=$2
+calculate_percentile() {
+  local values="$1"
+  local percentile="$2"
 
-  if [ ! -f "$file" ] || [ ! -s "$file" ]; then
-    echo "0:0:0:0:0"
-    return
-  fi
-
-  local values=$(grep "^SUCCESS" "$file" | cut -d: -f$metric_index | sort -n)
   local count=$(echo "$values" | wc -l)
-
   if [ "$count" -eq 0 ]; then
-    echo "0:0:0:0:0"
+    echo "0"
     return
   fi
 
-  local p50_idx=$(echo "($count * 50 / 100)" | bc)
-  local p90_idx=$(echo "($count * 90 / 100)" | bc)
-  local p95_idx=$(echo "($count * 95 / 100)" | bc)
-  local p99_idx=$(echo "($count * 99 / 100)" | bc)
+  local idx=$(echo "($count * $percentile / 100)" | bc)
+  [ "$idx" -lt 1 ] && idx=1
 
-  [ "$p50_idx" -lt 1 ] && p50_idx=1
-  [ "$p90_idx" -lt 1 ] && p90_idx=1
-  [ "$p95_idx" -lt 1 ] && p95_idx=1
-  [ "$p99_idx" -lt 1 ] && p99_idx=1
-
-  local mean=$(echo "$values" | awk '{sum+=$1; count+=1} END {if(count>0) print sum/count; else print 0}')
-  local p50=$(echo "$values" | sed -n "${p50_idx}p")
-  local p90=$(echo "$values" | sed -n "${p90_idx}p")
-  local p95=$(echo "$values" | sed -n "${p95_idx}p")
-  local p99=$(echo "$values" | sed -n "${p99_idx}p")
-
-  echo "$mean:$p50:$p90:$p95:$p99"
+  echo "$values" | sed -n "${idx}p"
 }
 
 # Overall success rate
-total_requests=$(cat "$TMPDIR"/*.txt 2>/dev/null | wc -l)
-successful_requests=$(grep -h "^SUCCESS" "$TMPDIR"/*.txt 2>/dev/null | wc -l)
-failed_requests=$(grep -h "^FAILED" "$TMPDIR"/*.txt 2>/dev/null | wc -l)
+total_requests=$(cat "$TMPDIR"/*.txt 2>/dev/null | wc -l | tr -d ' ')
+successful_requests=$(grep -h "^SUCCESS" "$TMPDIR"/*.txt 2>/dev/null | wc -l | tr -d ' ')
+failed_requests=$(grep -h "^FAILED" "$TMPDIR"/*.txt 2>/dev/null | wc -l | tr -d ' ')
 
 echo "═══════════════════════════════════════════════════"
 echo "1. OVERALL PERFORMANCE"
 echo "═══════════════════════════════════════════════════"
 echo "Total Requests:     $total_requests"
-echo "Successful:         $successful_requests ($(echo "scale=1; $successful_requests * 100 / $total_requests" | bc)%)"
+if [ "$total_requests" -gt 0 ]; then
+  success_pct=$(echo "scale=1; $successful_requests * 100 / $total_requests" | bc -l)
+  echo "Successful:         $successful_requests (${success_pct}%)"
+else
+  echo "Successful:         $successful_requests"
+fi
 echo "Failed:             $failed_requests"
 echo ""
 
 # End-to-end latency stats
-all_latencies="$TMPDIR/all_latencies.txt"
-grep -h "^SUCCESS" "$TMPDIR"/*.txt 2>/dev/null | cut -d: -f2 > "$all_latencies"
+echo "═══════════════════════════════════════════════════"
+echo "2. END-TO-END LATENCY (seconds)"
+echo "═══════════════════════════════════════════════════"
 
-if [ -s "$all_latencies" ]; then
-  stats=$(calculate_stats "$all_latencies" 1)
-  IFS=: read mean p50 p90 p95 p99 <<< "$stats"
+if [ "$successful_requests" -gt 0 ]; then
+  all_latencies=$(grep -h "^SUCCESS" "$TMPDIR"/*.txt 2>/dev/null | cut -d: -f2 | sort -n)
 
-  echo "═══════════════════════════════════════════════════"
-  echo "2. END-TO-END LATENCY (seconds)"
-  echo "═══════════════════════════════════════════════════"
+  mean=$(echo "$all_latencies" | awk '{sum+=$1; count+=1} END {if(count>0) printf "%.2f", sum/count; else print "0.00"}')
+  p50=$(calculate_percentile "$all_latencies" 50)
+  p90=$(calculate_percentile "$all_latencies" 90)
+  p95=$(calculate_percentile "$all_latencies" 95)
+  p99=$(calculate_percentile "$all_latencies" 99)
+
   printf "Mean:               %.2f s\n" $mean
   printf "P50 (median):       %.2f s\n" $p50
   printf "P90:                %.2f s\n" $p90
   printf "P95:                %.2f s\n" $p95
   printf "P99:                %.2f s\n" $p99
-  echo ""
+else
+  echo "No successful requests"
 fi
+echo ""
 
-# TTFT stats (estimated)
+# TTFT stats
 echo "═══════════════════════════════════════════════════"
 echo "3. TIME TO FIRST TOKEN - TTFT (estimated)"
 echo "═══════════════════════════════════════════════════"
-all_ttft="$TMPDIR/all_ttft.txt"
-grep -h "^SUCCESS" "$TMPDIR"/*.txt 2>/dev/null | cut -d: -f3 > "$all_ttft"
 
-if [ -s "$all_ttft" ]; then
-  stats=$(calculate_stats "$all_ttft" 1)
-  IFS=: read mean p50 p90 p95 p99 <<< "$stats"
+if [ "$successful_requests" -gt 0 ]; then
+  all_ttft=$(grep -h "^SUCCESS" "$TMPDIR"/*.txt 2>/dev/null | cut -d: -f3 | sort -n)
+
+  mean=$(echo "$all_ttft" | awk '{sum+=$1; count+=1} END {if(count>0) printf "%.2f", sum/count; else print "0.00"}')
+  p50=$(calculate_percentile "$all_ttft" 50)
+  p90=$(calculate_percentile "$all_ttft" 90)
+  p95=$(calculate_percentile "$all_ttft" 95)
+  p99=$(calculate_percentile "$all_ttft" 99)
 
   printf "Mean:               %.2f s\n" $mean
   printf "P50 (median):       %.2f s\n" $p50
@@ -282,58 +259,82 @@ if [ -s "$all_ttft" ]; then
     echo "⚠ (target: ≤0.5s interactive)"
   fi
   printf "P99:                %.2f s\n" $p99
-  echo ""
+else
+  echo "No successful requests"
 fi
+echo ""
 
-# TPOT stats (estimated)
+# TPOT stats
 echo "═══════════════════════════════════════════════════"
 echo "4. TIME PER OUTPUT TOKEN - TPOT (estimated)"
 echo "═══════════════════════════════════════════════════"
-all_tpot="$TMPDIR/all_tpot.txt"
-grep -h "^SUCCESS" "$TMPDIR"/*.txt 2>/dev/null | cut -d: -f4 | grep -v "^0$" > "$all_tpot"
 
-if [ -s "$all_tpot" ]; then
-  stats=$(calculate_stats "$all_tpot" 1)
-  IFS=: read mean p50 p90 p95 p99 <<< "$stats"
+if [ "$successful_requests" -gt 0 ]; then
+  all_tpot=$(grep -h "^SUCCESS" "$TMPDIR"/*.txt 2>/dev/null | cut -d: -f4 | grep -v "^0$\|^0\.0*$" | sort -n)
 
-  printf "Mean:               %.3f s (%.0f ms)\n" $mean $(echo "$mean * 1000" | bc)
-  printf "P50 (median):       %.3f s (%.0f ms)\n" $p50 $(echo "$p50 * 1000" | bc)
-  printf "P90:                %.3f s (%.0f ms)\n" $p90 $(echo "$p90 * 1000" | bc)
-  printf "P95:                %.3f s (%.0f ms) " $p95 $(echo "$p95 * 1000" | bc)
-  if (( $(echo "$p95 <= 0.03" | bc -l) )); then
-    echo "✓ (target: ≤30ms interactive)"
+  if [ ! -z "$all_tpot" ]; then
+    mean=$(echo "$all_tpot" | awk '{sum+=$1; count+=1} END {if(count>0) printf "%.4f", sum/count; else print "0.0000"}')
+    p50=$(calculate_percentile "$all_tpot" 50)
+    p90=$(calculate_percentile "$all_tpot" 90)
+    p95=$(calculate_percentile "$all_tpot" 95)
+    p99=$(calculate_percentile "$all_tpot" 99)
+
+    mean_ms=$(echo "$mean * 1000" | bc -l | awk '{printf "%.0f", $1}')
+    p50_ms=$(echo "$p50 * 1000" | bc -l | awk '{printf "%.0f", $1}')
+    p90_ms=$(echo "$p90 * 1000" | bc -l | awk '{printf "%.0f", $1}')
+    p95_ms=$(echo "$p95 * 1000" | bc -l | awk '{printf "%.0f", $1}')
+    p99_ms=$(echo "$p99 * 1000" | bc -l | awk '{printf "%.0f", $1}')
+
+    printf "Mean:               %.4f s (%s ms)\n" $mean $mean_ms
+    printf "P50 (median):       %.4f s (%s ms)\n" $p50 $p50_ms
+    printf "P90:                %.4f s (%s ms)\n" $p90 $p90_ms
+    printf "P95:                %.4f s (%s ms) " $p95 $p95_ms
+    if (( $(echo "$p95 <= 0.03" | bc -l) )); then
+      echo "✓ (target: ≤30ms interactive)"
+    else
+      echo "⚠ (target: ≤30ms interactive)"
+    fi
+    printf "P99:                %.4f s (%s ms)\n" $p99 $p99_ms
   else
-    echo "⚠ (target: ≤30ms interactive)"
+    echo "No TPOT data available"
   fi
-  printf "P99:                %.3f s (%.0f ms)\n" $p99 $(echo "$p99 * 1000" | bc)
-  echo ""
+else
+  echo "No successful requests"
 fi
+echo ""
 
 # Token throughput
 echo "═══════════════════════════════════════════════════"
 echo "5. THROUGHPUT METRICS"
 echo "═══════════════════════════════════════════════════"
-total_tokens=$(grep -h "^SUCCESS" "$TMPDIR"/*.txt 2>/dev/null | cut -d: -f6 | awk '{sum+=$1} END {print sum}')
-total_time=$(grep -h "^SUCCESS" "$TMPDIR"/*.txt 2>/dev/null | cut -d: -f2 | awk '{sum+=$1} END {print sum}')
 
-if [ "$successful_requests" -gt 0 ] && [ ! -z "$total_time" ]; then
-  avg_latency=$(echo "scale=2; $total_time / $successful_requests" | bc)
-  tokens_per_sec=$(echo "scale=2; $total_tokens / $total_time" | bc)
+if [ "$successful_requests" -gt 0 ]; then
+  total_tokens=$(grep -h "^SUCCESS" "$TMPDIR"/*.txt 2>/dev/null | cut -d: -f6 | awk '{sum+=$1} END {print sum}')
+  total_time=$(grep -h "^SUCCESS" "$TMPDIR"/*.txt 2>/dev/null | cut -d: -f2 | awk '{sum+=$1} END {print sum}')
+
+  tokens_per_sec=$(echo "scale=2; $total_tokens / $total_time" | bc -l)
+  avg_tokens=$(echo "scale=0; $total_tokens / $successful_requests" | bc -l)
 
   echo "Successful requests: $successful_requests"
   echo "Total tokens:        $total_tokens"
-  printf "Avg tokens/request:  %.0f\n" $(echo "$total_tokens / $successful_requests" | bc)
+  printf "Avg tokens/request:  %.0f\n" $avg_tokens
   printf "Token throughput:    %.2f tokens/s\n" $tokens_per_sec
-  echo ""
+else
+  echo "No successful requests"
 fi
+echo ""
 
 # Sustained throughput
 echo "═══════════════════════════════════════════════════"
 echo "6. SUSTAINED LOAD (20 requests over ${sustained_duration}s)"
 echo "═══════════════════════════════════════════════════"
 sustained_success=$(grep -c "^SUCCESS" "$TMPDIR/sustained.txt" 2>/dev/null || echo 0)
-sustained_throughput=$(echo "scale=2; $sustained_success / $sustained_duration" | bc)
-printf "Requests/second:     %.2f req/s\n" $sustained_throughput
+if [ "$sustained_duration" -gt 0 ]; then
+  sustained_throughput=$(echo "scale=2; $sustained_success / $sustained_duration" | bc -l)
+  printf "Requests/second:     %.2f req/s\n" $sustained_throughput
+else
+  echo "Duration: 0s"
+fi
 echo ""
 
 # Concurrency analysis
@@ -343,8 +344,8 @@ echo "════════════════════════�
 
 for level in 2 5 8 10; do
   file="$TMPDIR/concurrent_${level}.txt"
-  if [ -f "$file" ]; then
-    avg=$(grep "^SUCCESS" "$file" | cut -d: -f2 | awk '{sum+=$1; count+=1} END {if(count>0) printf "%.2f", sum/count; else print "N/A"}')
+  if [ -f "$file" ] && [ -s "$file" ]; then
+    avg=$(grep "^SUCCESS" "$file" 2>/dev/null | cut -d: -f2 | awk '{sum+=$1; count+=1} END {if(count>0) printf "%.2f", sum/count; else print "N/A"}')
     count=$(grep -c "^SUCCESS" "$file" 2>/dev/null || echo 0)
     echo "Concurrent $level:      ${avg}s avg latency ($count successful)"
   fi
@@ -359,8 +360,8 @@ echo "════════════════════════�
 echo "Input Length Impact:"
 for type in short medium long; do
   file="$TMPDIR/${type}_input.txt"
-  if [ -f "$file" ]; then
-    avg=$(grep "^SUCCESS" "$file" | cut -d: -f2 | awk '{sum+=$1; count+=1} END {if(count>0) printf "%.2f", sum/count; else print "N/A"}')
+  if [ -f "$file" ] && [ -s "$file" ]; then
+    avg=$(grep "^SUCCESS" "$file" 2>/dev/null | cut -d: -f2 | awk '{sum+=$1; count+=1} END {if(count>0) printf "%.2f", sum/count; else print "N/A"}')
     echo "  ${type^} input:       ${avg}s avg"
   fi
 done
@@ -369,9 +370,9 @@ echo ""
 echo "Output Length Impact:"
 for type in short medium long; do
   file="$TMPDIR/${type}_output.txt"
-  if [ -f "$file" ]; then
-    avg=$(grep "^SUCCESS" "$file" | cut -d: -f2 | awk '{sum+=$1; count+=1} END {if(count>0) printf "%.2f", sum/count; else print "N/A"}')
-    tokens=$(grep "^SUCCESS" "$file" | cut -d: -f6 | awk '{sum+=$1; count+=1} END {if(count>0) printf "%.0f", sum/count; else print "N/A"}')
+  if [ -f "$file" ] && [ -s "$file" ]; then
+    avg=$(grep "^SUCCESS" "$file" 2>/dev/null | cut -d: -f2 | awk '{sum+=$1; count+=1} END {if(count>0) printf "%.2f", sum/count; else print "N/A"}')
+    tokens=$(grep "^SUCCESS" "$file" 2>/dev/null | cut -d: -f6 | awk '{sum+=$1; count+=1} END {if(count>0) printf "%.0f", sum/count; else print "N/A"}')
     echo "  ${type^} output (~${tokens} tokens): ${avg}s avg"
   fi
 done
@@ -382,7 +383,6 @@ echo "BENCHMARK COMPLETE"
 echo "═══════════════════════════════════════════════════"
 echo ""
 echo "Summary: $successful_requests/$total_requests requests successful"
-echo "Runtime: ~4 minutes"
 echo ""
 
 # Cleanup
