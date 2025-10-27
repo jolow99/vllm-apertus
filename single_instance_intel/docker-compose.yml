@@ -30,11 +30,11 @@ services:
       - VLLM_API_KEY=${VLLM_API_KEY}
       - HUGGING_FACE_HUB_TOKEN=${HUGGING_FACE_HUB_TOKEN}
       # vLLM CPU Performance Optimizations (2x NUMA nodes, 48 cores each)
-      - VLLM_CPU_KVCACHE_SPACE=200          # 200GB KV cache
+      - VLLM_CPU_KVCACHE_SPACE=250          # 200GB KV cache
       - VLLM_CPU_OMP_THREADS_BIND=auto      # Auto-bind threads across both NUMA nodes
       - VLLM_CPU_NUM_OF_RESERVED_CPU=2      # Reserve 1 CPU per NUMA node for vLLM frontend
       - OMP_NUM_THREADS=94                  # Use 94 threads (96 - 2 reserved)
-      - VLLM_CPU_SGL_KERNEL=1              # NEW: Enable AMX small-batch kernels
+      - VLLM_CPU_SGL_KERNEL=0              # Enable AMX small-batch kernels
     security_opt:
       - seccomp=unconfined                  # Required for NUMA memory optimizations
     cap_add:
@@ -48,9 +48,10 @@ services:
       --max-model-len 32768
       --dtype bfloat16
       --tensor-parallel-size 2
-      --max-num-seqs 128
-      --max-num-batched-tokens 32768
+      --max-num-seqs 192
+      --max-num-batched-tokens 49152
       --enable-chunked-prefill
+      --disable-log-requests
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
