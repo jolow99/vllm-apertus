@@ -51,6 +51,7 @@ services:
       --max-num-seqs 192
       --max-num-batched-tokens 49152
       --enable-chunked-prefill
+      --enable-prefix-caching
       --disable-log-requests
     restart: unless-stopped
     healthcheck:
