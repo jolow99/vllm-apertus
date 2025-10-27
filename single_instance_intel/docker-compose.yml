@@ -34,6 +34,7 @@ services:
       - VLLM_CPU_OMP_THREADS_BIND=auto      # Auto-bind threads across both NUMA nodes
       - VLLM_CPU_NUM_OF_RESERVED_CPU=2      # Reserve 1 CPU per NUMA node for vLLM frontend
       - OMP_NUM_THREADS=94                  # Use 94 threads (96 - 2 reserved)
+      - VLLM_CPU_SGL_KERNEL=1              # NEW: Enable AMX small-batch kernels
     security_opt:
       - seccomp=unconfined                  # Required for NUMA memory optimizations
     cap_add:
