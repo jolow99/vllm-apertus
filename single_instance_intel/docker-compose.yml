@@ -29,18 +29,30 @@ services:
     environment:
       - VLLM_API_KEY=${VLLM_API_KEY}
       - HUGGING_FACE_HUB_TOKEN=${HUGGING_FACE_HUB_TOKEN}
+      # vLLM CPU Performance Optimizations (96 vCPU, 768GB RAM)
+      - VLLM_CPU_KVCACHE_SPACE=200          # 200GB KV cache for massive concurrency
+      - VLLM_CPU_OMP_THREADS_BIND=auto      # Auto-bind threads to NUMA nodes
+      - VLLM_CPU_SGL_KERNEL=1               # Enable AMX small-batch kernels for lower latency
+    security_opt:
+      - seccomp=unconfined                  # Required for NUMA memory optimizations
+    cap_add:
+      - SYS_NICE                            # Required for get_mempolicy syscall
+    shm_size: 8g                            # Shared memory for tensor operations (increased for high concurrency)
     command: >
       --model swiss-ai/Apertus-8B-Instruct-2509
       --host 0.0.0.0
       --port 8000
       --api-key ${VLLM_API_KEY}
       --max-model-len 32768
-      --dtype auto
+      --dtype bfloat16
+      --max-num-seqs 256
+      --enable-chunked-prefill
+      --max-num-batched-tokens 16384
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 60s
+      start_period: 120s
 
