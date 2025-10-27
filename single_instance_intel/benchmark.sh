@@ -3,7 +3,9 @@
 # Load environment variables from .env file if it exists
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 if [ -f "$SCRIPT_DIR/.env" ]; then
-  export $(grep -v '^#' "$SCRIPT_DIR/.env" | xargs)
+  set -a
+  source "$SCRIPT_DIR/.env"
+  set +a
 fi
 
 NUM_REQUESTS=${1:-30}
@@ -26,14 +28,22 @@ if [ -z "$VLLM_API_KEY" ]; then
   echo ""
 fi
 
-# Test connectivity first
-echo "Testing connectivity to http://localhost/v1..."
+# Determine if we should use HTTP or HTTPS
+BASE_URL="http://localhost"
+echo "Testing connectivity..."
 test_response=$(curl -s -o /dev/null -w "%{http_code}" http://localhost/v1/models)
+if [ "$test_response" = "301" ] || [ "$test_response" = "302" ]; then
+  echo "Detected redirect, using HTTPS..."
+  BASE_URL="https://localhost"
+  test_response=$(curl -s -k -o /dev/null -w "%{http_code}" https://localhost/v1/models)
+fi
+
 if [ "$test_response" != "200" ] && [ "$test_response" != "401" ]; then
   echo "⚠️  WARNING: Server may not be reachable (HTTP $test_response)"
-  echo "  Make sure your vLLM server is running at http://localhost"
+  echo "  Make sure your vLLM server is running"
   echo ""
 fi
+echo "Using endpoint: ${BASE_URL}/v1"
 echo ""
 
 # Create temp directory for results
@@ -49,7 +59,7 @@ for batch in $(seq 0 $((($NUM_REQUESTS - 1) / $CONCURRENT))); do
     if [ $req_num -le $NUM_REQUESTS ]; then
       (
         req_start=$(date +%s.%N)
-        response=$(curl -s -X POST http://localhost/v1/completions \
+        response=$(curl -s -k -X POST ${BASE_URL}/v1/completions \
           -H "Content-Type: application/json" \
           -H "Authorization: Bearer ${VLLM_API_KEY}" \
           -d '{"model":"swiss-ai/Apertus-8B-Instruct-2509","prompt":"Explain machine learning briefly.","max_tokens":50}')
