@@ -155,7 +155,7 @@ wait
 end_10=$(date +%s.%N)
 duration_10=$(echo "$end_10 - $start_10" | bc -l)
 
-# 20 concurrent (stress test)
+# 20 concurrent
 start_20=$(date +%s.%N)
 for i in {1..20}; do
   make_request "Test query $i" 50 "$TMPDIR/concurrent_20.txt" &
@@ -163,6 +163,24 @@ done
 wait
 end_20=$(date +%s.%N)
 duration_20=$(echo "$end_20 - $start_20" | bc -l)
+
+# 30 concurrent
+start_30=$(date +%s.%N)
+for i in {1..30}; do
+  make_request "Test query $i" 50 "$TMPDIR/concurrent_30.txt" &
+done
+wait
+end_30=$(date +%s.%N)
+duration_30=$(echo "$end_30 - $start_30" | bc -l)
+
+# 40 concurrent (stress test)
+start_40=$(date +%s.%N)
+for i in {1..40}; do
+  make_request "Test query $i" 50 "$TMPDIR/concurrent_40.txt" &
+done
+wait
+end_40=$(date +%s.%N)
+duration_40=$(echo "$end_40 - $start_40" | bc -l)
 
 echo "   ✓ Concurrent load test complete"
 echo ""
@@ -181,9 +199,9 @@ echo "   ✓ Sustained load test complete"
 echo ""
 
 # Test 6: Maximum burst throughput
-echo "[7/7] Testing maximum burst throughput (15 requests, all at once)..."
+echo "[7/7] Testing maximum burst throughput (30 requests, all at once)..."
 start_burst=$(date +%s.%N)
-for i in {1..15}; do
+for i in {1..30}; do
   make_request "Burst test $i" 50 "$TMPDIR/burst.txt" &
 done
 wait
@@ -289,6 +307,8 @@ calc_throughput "$TMPDIR/concurrent_2.txt" "$duration_2" 2
 calc_throughput "$TMPDIR/concurrent_5.txt" "$duration_5" 5
 calc_throughput "$TMPDIR/concurrent_10.txt" "$duration_10" 10
 calc_throughput "$TMPDIR/concurrent_20.txt" "$duration_20" 20
+calc_throughput "$TMPDIR/concurrent_30.txt" "$duration_30" 30
+calc_throughput "$TMPDIR/concurrent_40.txt" "$duration_40" 40
 
 echo ""
 echo "Interpretation: With N users, the system produces X tokens/second"
@@ -306,7 +326,7 @@ if [ -f "$TMPDIR/burst.txt" ]; then
   burst_tok_per_sec=$(echo "scale=2; $burst_tokens / $burst_duration" | bc -l)
   burst_req_per_sec=$(echo "scale=2; $burst_success / $burst_duration" | bc -l)
 
-  printf "15 requests sent simultaneously:\n"
+  printf "30 requests sent simultaneously:\n"
   printf "  Completed in:     %.2fs\n" "$burst_duration"
   printf "  Total tokens:     %d\n" "$burst_tokens"
   printf "  Throughput:       %.2f tokens/s\n" "$burst_tok_per_sec"
@@ -458,12 +478,14 @@ echo ""
 best_concurrent_throughput=0
 best_concurrent_level=0
 
-for level in 2 5 10 20; do
+for level in 2 5 10 20 30 40; do
   file="$TMPDIR/concurrent_${level}.txt"
   if [ "$level" -eq 2 ]; then duration="$duration_2"
   elif [ "$level" -eq 5 ]; then duration="$duration_5"
   elif [ "$level" -eq 10 ]; then duration="$duration_10"
   elif [ "$level" -eq 20 ]; then duration="$duration_20"
+  elif [ "$level" -eq 30 ]; then duration="$duration_30"
+  elif [ "$level" -eq 40 ]; then duration="$duration_40"
   fi
 
   if [ -f "$file" ]; then
