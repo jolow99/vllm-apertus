@@ -173,7 +173,7 @@ wait
 end_30=$(date +%s.%N)
 duration_30=$(echo "$end_30 - $start_30" | bc -l)
 
-# 40 concurrent (stress test)
+# 40 concurrent
 start_40=$(date +%s.%N)
 for i in {1..40}; do
   make_request "Test query $i" 50 "$TMPDIR/concurrent_40.txt" &
@@ -181,6 +181,42 @@ done
 wait
 end_40=$(date +%s.%N)
 duration_40=$(echo "$end_40 - $start_40" | bc -l)
+
+# 60 concurrent (heavy load)
+start_60=$(date +%s.%N)
+for i in {1..60}; do
+  make_request "Test query $i" 50 "$TMPDIR/concurrent_60.txt" &
+done
+wait
+end_60=$(date +%s.%N)
+duration_60=$(echo "$end_60 - $start_60" | bc -l)
+
+# 80 concurrent (heavy load)
+start_80=$(date +%s.%N)
+for i in {1..80}; do
+  make_request "Test query $i" 50 "$TMPDIR/concurrent_80.txt" &
+done
+wait
+end_80=$(date +%s.%N)
+duration_80=$(echo "$end_80 - $start_80" | bc -l)
+
+# 100 concurrent (heavy load)
+start_100=$(date +%s.%N)
+for i in {1..100}; do
+  make_request "Test query $i" 50 "$TMPDIR/concurrent_100.txt" &
+done
+wait
+end_100=$(date +%s.%N)
+duration_100=$(echo "$end_100 - $start_100" | bc -l)
+
+# 120 concurrent (maximum stress test)
+start_120=$(date +%s.%N)
+for i in {1..120}; do
+  make_request "Test query $i" 50 "$TMPDIR/concurrent_120.txt" &
+done
+wait
+end_120=$(date +%s.%N)
+duration_120=$(echo "$end_120 - $start_120" | bc -l)
 
 echo "   ✓ Concurrent load test complete"
 echo ""
@@ -309,6 +345,13 @@ calc_throughput "$TMPDIR/concurrent_10.txt" "$duration_10" 10
 calc_throughput "$TMPDIR/concurrent_20.txt" "$duration_20" 20
 calc_throughput "$TMPDIR/concurrent_30.txt" "$duration_30" 30
 calc_throughput "$TMPDIR/concurrent_40.txt" "$duration_40" 40
+
+echo ""
+echo "Heavy Load Tests:"
+calc_throughput "$TMPDIR/concurrent_60.txt" "$duration_60" 60
+calc_throughput "$TMPDIR/concurrent_80.txt" "$duration_80" 80
+calc_throughput "$TMPDIR/concurrent_100.txt" "$duration_100" 100
+calc_throughput "$TMPDIR/concurrent_120.txt" "$duration_120" 120
 
 echo ""
 echo "Interpretation: With N users, the system produces X tokens/second"
@@ -478,7 +521,7 @@ echo ""
 best_concurrent_throughput=0
 best_concurrent_level=0
 
-for level in 2 5 10 20 30 40; do
+for level in 2 5 10 20 30 40 60 80 100 120; do
   file="$TMPDIR/concurrent_${level}.txt"
   if [ "$level" -eq 2 ]; then duration="$duration_2"
   elif [ "$level" -eq 5 ]; then duration="$duration_5"
@@ -486,6 +529,10 @@ for level in 2 5 10 20 30 40; do
   elif [ "$level" -eq 20 ]; then duration="$duration_20"
   elif [ "$level" -eq 30 ]; then duration="$duration_30"
   elif [ "$level" -eq 40 ]; then duration="$duration_40"
+  elif [ "$level" -eq 60 ]; then duration="$duration_60"
+  elif [ "$level" -eq 80 ]; then duration="$duration_80"
+  elif [ "$level" -eq 100 ]; then duration="$duration_100"
+  elif [ "$level" -eq 120 ]; then duration="$duration_120"
   fi
 
   if [ -f "$file" ]; then
