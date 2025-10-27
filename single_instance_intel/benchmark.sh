@@ -1,5 +1,11 @@
 #!/bin/bash
 
+# Load environment variables from .env file if it exists
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [ -f "$SCRIPT_DIR/.env" ]; then
+  export $(grep -v '^#' "$SCRIPT_DIR/.env" | xargs)
+fi
+
 NUM_REQUESTS=${1:-30}
 CONCURRENT=${2:-5}
 
@@ -11,6 +17,23 @@ echo "Configuration:"
 echo "  Total requests: $NUM_REQUESTS"
 echo "  Concurrent requests: $CONCURRENT"
 echo "  Model: swiss-ai/Apertus-8B-Instruct-2509"
+echo ""
+
+# Check if VLLM_API_KEY is set
+if [ -z "$VLLM_API_KEY" ]; then
+  echo "⚠️  WARNING: VLLM_API_KEY environment variable is not set"
+  echo "  If your server requires authentication, the requests will fail."
+  echo ""
+fi
+
+# Test connectivity first
+echo "Testing connectivity to http://localhost/v1..."
+test_response=$(curl -s -o /dev/null -w "%{http_code}" http://localhost/v1/models)
+if [ "$test_response" != "200" ] && [ "$test_response" != "401" ]; then
+  echo "⚠️  WARNING: Server may not be reachable (HTTP $test_response)"
+  echo "  Make sure your vLLM server is running at http://localhost"
+  echo ""
+fi
 echo ""
 
 # Create temp directory for results
@@ -36,9 +59,14 @@ for batch in $(seq 0 $((($NUM_REQUESTS - 1) / $CONCURRENT))); do
 
         if echo "$response" | grep -q '"choices"'; then
           tokens=$(echo "$response" | grep -o '"completion_tokens":[0-9]*' | grep -o '[0-9]*')
+          [ -z "$tokens" ] && tokens=0
           echo "SUCCESS:$latency:$tokens" >> "$TMPDIR/results.txt"
         else
           echo "FAILED:$latency:0" >> "$TMPDIR/results.txt"
+          # Save first failure for debugging
+          if [ ! -f "$TMPDIR/first_error.txt" ]; then
+            echo "$response" > "$TMPDIR/first_error.txt"
+          fi
         fi
       ) &
     fi
@@ -64,9 +92,11 @@ echo "  ✗ Failed: $failed_count"
 echo ""
 echo "Performance:"
 echo "  Total time: $(printf '%.2f' $total_time) seconds"
-echo "  Throughput: $(echo "scale=2; $success_count / $total_time" | bc) req/s"
 
-if [ $success_count -gt 0 ]; then
+if [ "$success_count" -gt 0 ]; then
+  throughput=$(echo "scale=2; $success_count / $total_time" | bc)
+  echo "  Throughput: $throughput req/s"
+
   avg_latency=$(grep "^SUCCESS" "$TMPDIR/results.txt" | cut -d: -f2 | awk '{sum+=$1; count+=1} END {print sum/count}')
   total_tokens=$(grep "^SUCCESS" "$TMPDIR/results.txt" | cut -d: -f3 | awk '{sum+=$1} END {print sum}')
   tokens_per_sec=$(echo "scale=2; $total_tokens / $total_time" | bc)
@@ -74,6 +104,18 @@ if [ $success_count -gt 0 ]; then
   echo "  Avg latency: $(printf '%.2f' $avg_latency) seconds"
   echo "  Total tokens: $total_tokens"
   echo "  Token throughput: $tokens_per_sec tokens/s"
+else
+  echo "  Throughput: 0 req/s"
+  echo ""
+  echo "❌ All requests failed!"
+
+  if [ -f "$TMPDIR/first_error.txt" ]; then
+    echo ""
+    echo "First error response:"
+    echo "────────────────────────────────────────"
+    cat "$TMPDIR/first_error.txt"
+    echo "────────────────────────────────────────"
+  fi
 fi
 
 echo ""
