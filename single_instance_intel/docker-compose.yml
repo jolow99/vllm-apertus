@@ -29,15 +29,16 @@ services:
     environment:
       - VLLM_API_KEY=${VLLM_API_KEY}
       - HUGGING_FACE_HUB_TOKEN=${HUGGING_FACE_HUB_TOKEN}
-      # vLLM CPU Performance Optimizations (96 vCPU, 768GB RAM)
-      - VLLM_CPU_KVCACHE_SPACE=200          # 200GB KV cache for massive concurrency
-      - VLLM_CPU_OMP_THREADS_BIND=auto      # Auto-bind threads to NUMA nodes
-      - VLLM_CPU_SGL_KERNEL=1               # Enable AMX small-batch kernels for lower latency
+      # vLLM CPU Performance Optimizations (2x NUMA nodes, 48 cores each)
+      - VLLM_CPU_KVCACHE_SPACE=200          # 200GB KV cache
+      - VLLM_CPU_OMP_THREADS_BIND=auto      # Auto-bind threads across both NUMA nodes
+      - VLLM_CPU_NUM_OF_RESERVED_CPU=2      # Reserve 1 CPU per NUMA node for vLLM frontend
+      - OMP_NUM_THREADS=94                  # Use 94 threads (96 - 2 reserved)
     security_opt:
       - seccomp=unconfined                  # Required for NUMA memory optimizations
     cap_add:
       - SYS_NICE                            # Required for get_mempolicy syscall
-    shm_size: 8g                            # Shared memory for tensor operations (increased for high concurrency)
+    shm_size: 16g                           # Increased for tensor parallelism
     command: >
       --model swiss-ai/Apertus-8B-Instruct-2509
       --host 0.0.0.0
@@ -45,14 +46,14 @@ services:
       --api-key ${VLLM_API_KEY}
       --max-model-len 32768
       --dtype bfloat16
-      --max-num-seqs 256
+      --tensor-parallel-size 2
+      --max-num-seqs 128
+      --max-num-batched-tokens 32768
       --enable-chunked-prefill
-      --max-num-batched-tokens 16384
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 120s
-
+      start_period: 180s                    # Increased for TP initialization
