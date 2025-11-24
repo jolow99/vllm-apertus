@@ -30,11 +30,11 @@ services:
     environment:
       - VLLM_API_KEY=${VLLM_API_KEY}
       - HUGGING_FACE_HUB_TOKEN=${HUGGING_FACE_HUB_TOKEN}
-      # vLLM CPU Performance Optimizations (Equal split: 47 cores for Apertus)
+      # vLLM CPU Performance Optimizations (NUMA node 0: 48 cores)
       - VLLM_CPU_KVCACHE_SPACE=200          # 200GB KV cache
-      - VLLM_CPU_OMP_THREADS_BIND=0-46      # Bind to first 47 cores
+      - VLLM_CPU_OMP_THREADS_BIND=0-47      # Bind to NUMA node 0 (cores 0-47)
       - VLLM_CPU_NUM_OF_RESERVED_CPU=1      # Reserve 1 CPU for vLLM frontend
-      - OMP_NUM_THREADS=47                  # Use 47 threads
+      - OMP_NUM_THREADS=48                  # Use 48 threads
       - VLLM_CPU_SGL_KERNEL=0              # Enable AMX small-batch kernels
     security_opt:
       - seccomp=unconfined                  # Required for NUMA memory optimizations
@@ -72,11 +72,11 @@ services:
     environment:
       - VLLM_API_KEY=${VLLM_API_KEY}
       - HUGGING_FACE_HUB_TOKEN=${HUGGING_FACE_HUB_TOKEN}
-      # vLLM CPU Performance Optimizations (Equal split: 47 cores for Olmo)
+      # vLLM CPU Performance Optimizations (NUMA node 1: 48 cores)
       - VLLM_CPU_KVCACHE_SPACE=150          # 150GB KV cache
-      - VLLM_CPU_OMP_THREADS_BIND=47-93     # Bind to cores 47-93
+      - VLLM_CPU_OMP_THREADS_BIND=48-95     # Bind to NUMA node 1 (cores 48-95)
       - VLLM_CPU_NUM_OF_RESERVED_CPU=1      # Reserve 1 CPU for vLLM frontend
-      - OMP_NUM_THREADS=47                  # Use 47 threads
+      - OMP_NUM_THREADS=48                  # Use 48 threads
       - VLLM_CPU_SGL_KERNEL=0              # Enable AMX small-batch kernels
     security_opt:
       - seccomp=unconfined                  # Required for NUMA memory optimizations
