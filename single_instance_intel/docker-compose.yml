@@ -30,9 +30,9 @@ services:
     environment:
       - VLLM_API_KEY=${VLLM_API_KEY}
       - HUGGING_FACE_HUB_TOKEN=${HUGGING_FACE_HUB_TOKEN}
-      # vLLM CPU Performance Optimizations (NUMA node 0: 48 cores)
+      # vLLM CPU Performance Optimizations (NUMA node 0: CPUs 0-23,48-71)
       - VLLM_CPU_KVCACHE_SPACE=200          # 200GB KV cache
-      - VLLM_CPU_OMP_THREADS_BIND=0-47      # Bind to NUMA node 0 (cores 0-47)
+      - VLLM_CPU_OMP_THREADS_BIND=0-23,48-71  # Bind to NUMA node 0
       - VLLM_CPU_NUM_OF_RESERVED_CPU=1      # Reserve 1 CPU for vLLM frontend
       - OMP_NUM_THREADS=48                  # Use 48 threads
       - VLLM_CPU_SGL_KERNEL=0              # Enable AMX small-batch kernels
@@ -72,9 +72,9 @@ services:
     environment:
       - VLLM_API_KEY=${VLLM_API_KEY}
       - HUGGING_FACE_HUB_TOKEN=${HUGGING_FACE_HUB_TOKEN}
-      # vLLM CPU Performance Optimizations (NUMA node 1: 48 cores)
+      # vLLM CPU Performance Optimizations (NUMA node 1: CPUs 24-47,72-95)
       - VLLM_CPU_KVCACHE_SPACE=150          # 150GB KV cache
-      - VLLM_CPU_OMP_THREADS_BIND=48-95     # Bind to NUMA node 1 (cores 48-95)
+      - VLLM_CPU_OMP_THREADS_BIND=24-47,72-95  # Bind to NUMA node 1
       - VLLM_CPU_NUM_OF_RESERVED_CPU=1      # Reserve 1 CPU for vLLM frontend
       - OMP_NUM_THREADS=48                  # Use 48 threads
       - VLLM_CPU_SGL_KERNEL=0              # Enable AMX small-batch kernels
