@@ -10,6 +10,7 @@ services:
       - ./ssl:/etc/nginx/ssl:ro
     depends_on:
       - vllm-apertus
+      - vllm-olmo
     restart: unless-stopped
     deploy:
       resources:
@@ -29,17 +30,17 @@ services:
     environment:
       - VLLM_API_KEY=${VLLM_API_KEY}
       - HUGGING_FACE_HUB_TOKEN=${HUGGING_FACE_HUB_TOKEN}
-      # vLLM CPU Performance Optimizations (2x NUMA nodes, 48 cores each)
-      - VLLM_CPU_KVCACHE_SPACE=250          # 200GB KV cache
-      - VLLM_CPU_OMP_THREADS_BIND=auto      # Auto-bind threads across both NUMA nodes
-      - VLLM_CPU_NUM_OF_RESERVED_CPU=2      # Reserve 1 CPU per NUMA node for vLLM frontend
-      - OMP_NUM_THREADS=94                  # Use 94 threads (96 - 2 reserved)
+      # vLLM CPU Performance Optimizations (Equal split: 47 cores for Apertus)
+      - VLLM_CPU_KVCACHE_SPACE=200          # 200GB KV cache
+      - VLLM_CPU_OMP_THREADS_BIND=0-46      # Bind to first 47 cores
+      - VLLM_CPU_NUM_OF_RESERVED_CPU=1      # Reserve 1 CPU for vLLM frontend
+      - OMP_NUM_THREADS=47                  # Use 47 threads
       - VLLM_CPU_SGL_KERNEL=0              # Enable AMX small-batch kernels
     security_opt:
       - seccomp=unconfined                  # Required for NUMA memory optimizations
     cap_add:
       - SYS_NICE                            # Required for get_mempolicy syscall
-    shm_size: 16g                           # Increased for tensor parallelism
+    shm_size: 16g
     command: >
       --model swiss-ai/Apertus-8B-Instruct-2509
       --host 0.0.0.0
@@ -47,9 +48,9 @@ services:
       --api-key ${VLLM_API_KEY}
       --max-model-len 32768
       --dtype bfloat16
-      --tensor-parallel-size 2
-      --max-num-seqs 192
-      --max-num-batched-tokens 49152
+      --tensor-parallel-size 1
+      --max-num-seqs 128
+      --max-num-batched-tokens 32768
       --enable-chunked-prefill
       --enable-prefix-caching
       --disable-log-requests
@@ -59,4 +60,46 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 180s                    # Increased for TP initialization
+      start_period: 120s
+
+  vllm-olmo:
+    image: public.ecr.aws/q9t5s3a7/vllm-cpu-release-repo:latest
+    container_name: vllm-olmo
+    expose:
+      - "8001"
+    volumes:
+      - ./hf_cache:/root/.cache/huggingface
+    environment:
+      - VLLM_API_KEY=${VLLM_API_KEY}
+      - HUGGING_FACE_HUB_TOKEN=${HUGGING_FACE_HUB_TOKEN}
+      # vLLM CPU Performance Optimizations (Equal split: 47 cores for Olmo)
+      - VLLM_CPU_KVCACHE_SPACE=150          # 150GB KV cache
+      - VLLM_CPU_OMP_THREADS_BIND=47-93     # Bind to cores 47-93
+      - VLLM_CPU_NUM_OF_RESERVED_CPU=1      # Reserve 1 CPU for vLLM frontend
+      - OMP_NUM_THREADS=47                  # Use 47 threads
+      - VLLM_CPU_SGL_KERNEL=0              # Enable AMX small-batch kernels
+    security_opt:
+      - seccomp=unconfined                  # Required for NUMA memory optimizations
+    cap_add:
+      - SYS_NICE                            # Required for get_mempolicy syscall
+    shm_size: 16g
+    command: >
+      --model allenai/Olmo-3-7B-Think
+      --host 0.0.0.0
+      --port 8001
+      --api-key ${VLLM_API_KEY}
+      --max-model-len 32768
+      --dtype bfloat16
+      --tensor-parallel-size 1
+      --max-num-seqs 128
+      --max-num-batched-tokens 32768
+      --enable-chunked-prefill
+      --enable-prefix-caching
+      --disable-log-requests
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 120s
