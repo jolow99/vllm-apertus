@@ -84,7 +84,7 @@ services:
       - SYS_NICE                            # Required for get_mempolicy syscall
     shm_size: 16g
     command: >
-      --model allenai/Olmo-3-7B-Think
+      --model allenai/Olmo-3-7B-Instruct
       --host 0.0.0.0
       --port 8001
       --api-key ${VLLM_API_KEY}
