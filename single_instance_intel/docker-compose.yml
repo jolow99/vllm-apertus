@@ -90,6 +90,8 @@ services:
       --port 8001
       --api-key ${VLLM_API_KEY}
       --chat-template /app/olmo_templates/chat_template.jinja
+      --enable-auto-tool-choice
+      --tool-call-parser olmo3
       --max-model-len 32768
       --dtype bfloat16
       --tensor-parallel-size 1
