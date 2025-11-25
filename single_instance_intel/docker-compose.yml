@@ -69,6 +69,7 @@ services:
       - "8001"
     volumes:
       - ./hf_cache:/root/.cache/huggingface
+      - ./olmo_templates:/app/olmo_templates
     environment:
       - VLLM_API_KEY=${VLLM_API_KEY}
       - HUGGING_FACE_HUB_TOKEN=${HUGGING_FACE_HUB_TOKEN}
@@ -88,6 +89,7 @@ services:
       --host 0.0.0.0
       --port 8001
       --api-key ${VLLM_API_KEY}
+      --chat-template /app/olmo_templates/chat_template.jinja
       --max-model-len 32768
       --dtype bfloat16
       --tensor-parallel-size 1

@@ -1,0 +1,12 @@
+{% if messages[0]['role'] != 'system' %}
+  <|im_start|>system
+  You are a helpful function-calling AI assistant.
+  You do not currently have access to any functions. <functions></functions><|im_end|>
+  {% endif %}
+  {% for message in messages %}
+  <|im_start|>{{ message['role'] }}
+  {{ message['content'] }}<|im_end|>
+  {% endfor %}
+  {% if add_generation_prompt %}
+  <|im_start|>assistant
+  {% endif %}
