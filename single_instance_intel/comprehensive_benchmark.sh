@@ -1,8 +1,8 @@
 #!/bin/bash
 
-# Comprehensive LLM Deployment Benchmark v3
-# Fixed: Clear separation of sequential vs concurrent throughput
-# Runtime: ~3-5 minutes
+# Comprehensive LLM Deployment Benchmark v4
+# Multi-model support with nginx routing
+# Runtime: ~3-5 minutes per model
 
 set -e
 
@@ -14,31 +14,65 @@ if [ -f "$SCRIPT_DIR/.env" ]; then
   set +a
 fi
 
+# Model selection
+MODEL_CHOICE="${1:-apertus}"
+
+case "$MODEL_CHOICE" in
+  apertus)
+    MODEL_NAME="swiss-ai/Apertus-8B-Instruct-2509"
+    MODEL_PATH="/apertus"
+    MODEL_DISPLAY="Apertus-8B"
+    ;;
+  olmo)
+    MODEL_NAME="allenai/Olmo-3-7B-Instruct"
+    MODEL_PATH="/olmo"
+    MODEL_DISPLAY="Olmo-3-7B"
+    ;;
+  eurollm)
+    MODEL_NAME="utter-project/EuroLLM-22B-Instruct-2512"
+    MODEL_PATH="/eurollm"
+    MODEL_DISPLAY="EuroLLM-22B"
+    ;;
+  *)
+    echo "Usage: $0 [apertus|olmo|eurollm]"
+    echo ""
+    echo "Available models:"
+    echo "  apertus  - swiss-ai/Apertus-8B-Instruct-2509"
+    echo "  olmo     - allenai/Olmo-3-7B-Instruct"
+    echo "  eurollm  - utter-project/EuroLLM-22B-Instruct-2512"
+    exit 1
+    ;;
+esac
+
 # Configuration
 TMPDIR=$(mktemp -d)
 
 echo "╔════════════════════════════════════════════════════╗"
-echo "║   Comprehensive LLM Deployment Benchmark v3        ║"
-echo "║   Fixed: Accurate throughput calculations          ║"
+echo "║   Comprehensive LLM Deployment Benchmark v4        ║"
+echo "║   Multi-model nginx routing support                ║"
 echo "╚════════════════════════════════════════════════════╝"
+echo ""
+echo "Testing model: $MODEL_DISPLAY"
+echo "Model path: $MODEL_PATH"
 echo ""
 
 # Determine if we should use HTTP or HTTPS
 BASE_URL="http://localhost"
 echo "[1/7] Testing connectivity..."
-test_response=$(curl -s -o /dev/null -w "%{http_code}" http://localhost/v1/models 2>/dev/null || echo "000")
+test_response=$(curl -s -o /dev/null -w "%{http_code}" http://localhost${MODEL_PATH}/v1/models 2>/dev/null || echo "000")
 if [ "$test_response" = "301" ] || [ "$test_response" = "302" ]; then
   BASE_URL="https://localhost"
-  test_response=$(curl -s -k -o /dev/null -w "%{http_code}" https://localhost/v1/models 2>/dev/null || echo "000")
+  test_response=$(curl -s -k -o /dev/null -w "%{http_code}" https://localhost${MODEL_PATH}/v1/models 2>/dev/null || echo "000")
 fi
 
 if [ "$test_response" != "200" ] && [ "$test_response" != "401" ]; then
   echo "❌ ERROR: Server not reachable (HTTP $test_response)"
-  echo "   Make sure your vLLM server is running"
+  echo "   Make sure your vLLM server is running and nginx is configured"
+  echo "   Testing path: ${BASE_URL}${MODEL_PATH}/v1/models"
   rm -rf "$TMPDIR"
   exit 1
 fi
-echo "   ✓ Server reachable at ${BASE_URL}/v1"
+echo "   ✓ Server reachable at ${BASE_URL}${MODEL_PATH}/v1"
 echo ""
 
 # Helper function to make requests and measure timing
@@ -49,10 +83,10 @@ make_request() {
 
   local start_time=$(date +%s.%N)
 
-  response=$(curl -s -k -X POST "${BASE_URL}/v1/completions" \
+  response=$(curl -s -k -X POST "${BASE_URL}${MODEL_PATH}/v1/completions" \
     -H "Content-Type: application/json" \
     -H "Authorization: Bearer ${VLLM_API_KEY}" \
-    -d "{\"model\":\"swiss-ai/Apertus-8B-Instruct-2509\",\"prompt\":\"${prompt}\",\"max_tokens\":${max_tokens}}" \
+    -d "{\"model\":\"${MODEL_NAME}\",\"prompt\":\"${prompt}\",\"max_tokens\":${max_tokens}}" \
     2>/dev/null)
 
   local end_time=$(date +%s.%N)
@@ -515,6 +549,8 @@ echo ""
 echo "═══════════════════════════════════════════════════"
 echo "SUMMARY & RECOMMENDATIONS"
 echo "═══════════════════════════════════════════════════"
+echo ""
+echo "Model tested: $MODEL_DISPLAY ($MODEL_NAME)"
 echo ""
 
 # Calculate best concurrent throughput
