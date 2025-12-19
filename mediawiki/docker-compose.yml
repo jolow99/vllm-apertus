@@ -1,0 +1,80 @@
+services:
+  caddy:
+    image: caddy:2-alpine
+    container_name: wiki-caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"  # HTTP/3
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./caddy_data:/data
+      - ./caddy_config:/config
+    depends_on:
+      - mediawiki
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 256M
+
+  mediawiki:
+    image: mediawiki:1.41
+    container_name: wiki-mediawiki
+    restart: unless-stopped
+    expose:
+      - "80"
+    volumes:
+      - ./images:/var/www/html/images
+      - ./LocalSettings.php:/var/www/html/LocalSettings.php:ro
+    environment:
+      - MEDIAWIKI_DB_TYPE=mysql
+      - MEDIAWIKI_DB_HOST=mariadb
+      - MEDIAWIKI_DB_NAME=${WIKI_DB_NAME}
+      - MEDIAWIKI_DB_USER=${WIKI_DB_USER}
+      - MEDIAWIKI_DB_PASSWORD=${WIKI_DB_PASSWORD}
+      - MEDIAWIKI_SITE_NAME=${WIKI_SITE_NAME}
+      - MEDIAWIKI_SITE_SERVER=https://wiki.publicai.co
+      - MEDIAWIKI_ADMIN_USER=${WIKI_ADMIN_USER}
+      - MEDIAWIKI_ADMIN_PASS=${WIKI_ADMIN_PASS}
+    depends_on:
+      mariadb:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+        reservations:
+          memory: 1G
+
+  mariadb:
+    image: mariadb:11.2
+    container_name: wiki-mariadb
+    restart: unless-stopped
+    volumes:
+      - ./mariadb_data:/var/lib/mysql
+    environment:
+      - MYSQL_DATABASE=${WIKI_DB_NAME}
+      - MYSQL_USER=${WIKI_DB_USER}
+      - MYSQL_PASSWORD=${WIKI_DB_PASSWORD}
+      - MYSQL_ROOT_PASSWORD=${WIKI_DB_ROOT_PASSWORD}
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+        reservations:
+          memory: 1G
+
+volumes:
+  mariadb_data:
+  caddy_data:
+  caddy_config:
+  images:
