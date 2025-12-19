@@ -162,8 +162,7 @@ services:
       - "80"
     volumes:
       - ./wiki_images:/var/www/html/images
-      # Uncomment after completing installation and placing LocalSettings.php
-      #- ./LocalSettings.php:/var/www/html/LocalSettings.php:ro
+      - ./LocalSettings.php:/var/www/html/LocalSettings.php:ro
     environment:
       - MEDIAWIKI_DB_TYPE=mysql
       - MEDIAWIKI_DB_HOST=mariadb
