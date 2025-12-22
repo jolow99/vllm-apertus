@@ -178,6 +178,9 @@ services:
       - ./canasta/config:/mediawiki/config
       - ./canasta/images:/mediawiki/images
       - ./canasta/sitemap:/mediawiki/sitemap
+      # PSR-7 compatibility patches for MediaWiki 1.43.6
+      - ./mediawiki-patches/includes/http/MWCallbackStream.php:/var/www/mediawiki/w/includes/http/MWCallbackStream.php:ro
+      - ./mediawiki-patches/includes/Rest/StringStream.php:/var/www/mediawiki/w/includes/Rest/StringStream.php:ro
     deploy:
       resources:
         limits:
