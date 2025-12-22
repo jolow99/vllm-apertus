@@ -213,7 +213,7 @@ services:
     environment:
       - discovery.type=single-node
       - bootstrap.memory_lock=true
-      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+      - "ES_JAVA_OPTS=-Xms16g -Xmx16g"
     ulimits:
       memlock:
         soft: -1
@@ -223,6 +223,6 @@ services:
     deploy:
       resources:
         limits:
-          memory: 1G
+          memory: 32G
         reservations:
-          memory: 512M
+          memory: 16G
