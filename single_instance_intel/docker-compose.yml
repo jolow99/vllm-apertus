@@ -13,7 +13,7 @@ services:
       - vllm-apertus
       - vllm-olmo
       - vllm-eurollm
-      - mediawiki
+      - canasta-web
     restart: unless-stopped
     deploy:
       resources:
@@ -154,28 +154,51 @@ services:
       retries: 3
       start_period: 180s
 
-  mediawiki:
-    image: mediawiki:1.41
-    container_name: wiki-mediawiki
+  canasta-web:
+    image: ghcr.io/canastawiki/canasta:latest
+    container_name: canasta-web
     restart: unless-stopped
+    extra_hosts:
+      - "gateway.docker.internal:host-gateway"
     expose:
       - "80"
-    volumes:
-      - ./wiki_images:/var/www/html/images
-      - ./LocalSettings.php:/var/www/html/LocalSettings.php:ro
-    environment:
-      - MEDIAWIKI_DB_TYPE=mysql
-      - MEDIAWIKI_DB_HOST=mariadb
-      - MEDIAWIKI_DB_NAME=${WIKI_DB_NAME}
-      - MEDIAWIKI_DB_USER=${WIKI_DB_USER}
-      - MEDIAWIKI_DB_PASSWORD=${WIKI_DB_PASSWORD}
-      - MEDIAWIKI_SITE_NAME=${WIKI_SITE_NAME}
-      - MEDIAWIKI_SITE_SERVER=https://wiki.publicai.co
-      - MEDIAWIKI_ADMIN_USER=${WIKI_ADMIN_USER}
-      - MEDIAWIKI_ADMIN_PASS=${WIKI_ADMIN_PASS}
     depends_on:
-      mariadb:
-        condition: service_healthy
+      - canasta-db
+      - canasta-elasticsearch
+    environment:
+      - MW_SITE_SERVER=${MW_SITE_SERVER}
+      - PHP_UPLOAD_MAX_FILESIZE=${PHP_UPLOAD_MAX_FILESIZE}
+      - PHP_POST_MAX_SIZE=${PHP_POST_MAX_SIZE}
+      - PHP_MAX_INPUT_VARS=${PHP_MAX_INPUT_VARS}
+      - MW_SITEMAP_SUBDIR=${MW_SITEMAP_SUBDIR}
+      - MW_SITEMAP_IDENTIFIER=${MW_SITEMAP_IDENTIFIER}
+    volumes:
+      - ./canasta/extensions:/var/www/mediawiki/w/user-extensions
+      - ./canasta/skins:/var/www/mediawiki/w/user-skins
+      - ./canasta/config:/mediawiki/config
+      - ./canasta/images:/mediawiki/images
+      - ./canasta/sitemap:/mediawiki/sitemap
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+        reservations:
+          memory: 2G
+
+  canasta-db:
+    image: docker.io/library/mysql:8.0
+    container_name: canasta-db
+    command: --default-authentication-plugin=mysql_native_password --expire_logs_days=3 --secure-file-priv=""
+    cap_add:
+      - SYS_NICE
+    restart: unless-stopped
+    environment:
+      - MYSQL_ROOT_HOST=%
+      - MYSQL_ROOT_PASSWORD=${MYSQL_PASSWORD}
+      - MYSQL_DATABASE=mediawiki
+    volumes:
+      - ./canasta/_initdb:/docker-entrypoint-initdb.d
+      - ./canasta/mysql-data:/var/lib/mysql
     deploy:
       resources:
         limits:
@@ -183,26 +206,23 @@ services:
         reservations:
           memory: 1G
 
-  mariadb:
-    image: mariadb:11.2
-    container_name: wiki-mariadb
+  canasta-elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:7.10.2
+    container_name: canasta-elasticsearch
     restart: unless-stopped
-    volumes:
-      - ./wiki_mariadb_data:/var/lib/mysql
     environment:
-      - MYSQL_DATABASE=${WIKI_DB_NAME}
-      - MYSQL_USER=${WIKI_DB_USER}
-      - MYSQL_PASSWORD=${WIKI_DB_PASSWORD}
-      - MYSQL_ROOT_PASSWORD=${WIKI_DB_ROOT_PASSWORD}
-    healthcheck:
-      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 30s
+      - discovery.type=single-node
+      - bootstrap.memory_lock=true
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    volumes:
+      - ./canasta/elasticsearch:/usr/share/elasticsearch/data
     deploy:
       resources:
         limits:
-          memory: 2G
-        reservations:
           memory: 1G
+        reservations:
+          memory: 512M
