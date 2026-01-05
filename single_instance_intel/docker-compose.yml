@@ -57,6 +57,7 @@ services:
       --enable-chunked-prefill
       --enable-prefix-caching
       --disable-log-requests
+      --limit-mm-per-prompt image=2
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
