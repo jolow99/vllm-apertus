@@ -35,9 +35,9 @@ services:
       - HUGGING_FACE_HUB_TOKEN=${HUGGING_FACE_HUB_TOKEN}
       # vLLM CPU Performance Optimizations (NUMA node 0: 24 CPUs)
       - VLLM_CPU_KVCACHE_SPACE=120          # 120GB KV cache
-      - VLLM_CPU_OMP_THREADS_BIND=2-11,50-59  # Bind to NUMA node 0 (24 CPUs)
-      - VLLM_CPU_NUM_OF_RESERVED_CPU=1      # Reserve 1 CPU for vLLM frontend
-      - OMP_NUM_THREADS=20                  # Use 24 threads
+      - VLLM_CPU_OMP_THREADS_BIND=3-11,50-59  # Bind to NUMA node 0 (24 CPUs)
+      - VLLM_CPU_NUM_OF_RESERVED_CPU=2      # Reserve 1 CPU for vLLM frontend
+      - OMP_NUM_THREADS=19                  # Use 24 threads
       - VLLM_CPU_SGL_KERNEL=0              # Enable AMX small-batch kernels
     security_opt:
       - seccomp=unconfined                  # Required for NUMA memory optimizations
